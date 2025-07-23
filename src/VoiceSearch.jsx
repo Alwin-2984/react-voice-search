@@ -18,6 +18,13 @@ const DefaultMicIcon = ({ className }) => (
 // Check if code is running in browser environment
 const isBrowser = typeof window !== "undefined";
 
+// Store speech recognition constructor globally
+let SpeechRecognition = null;
+if (isBrowser) {
+  SpeechRecognition =
+    window.SpeechRecognition || window.webkitSpeechRecognition || null;
+}
+
 const VoiceSearch = ({
   width,
   darkMode = false,
@@ -29,15 +36,19 @@ const VoiceSearch = ({
   Error = () => {},
 }) => {
   const [isListening, setIsListening] = useState(false);
-  const [recognition, setRecognition] = useState(null);
   const [volume, setVolume] = useState(0);
   const [isAndroid, setIsAndroid] = useState(false);
   const [isSpeechRecognitionSupported, setIsSpeechRecognitionSupported] =
     useState(false);
+
+  // Use refs to track instances that need cleanup
+  const recognitionRef = useRef(null);
   const audioContextRef = useRef(null);
   const analyserRef = useRef(null);
   const microphoneStreamRef = useRef(null);
   const animationFrameRef = useRef(null);
+  const cleanupTimeoutRef = useRef(null);
+  const isAnimatingRef = useRef(false);
 
   // Check browser compatibility for speech recognition
   useEffect(() => {
@@ -51,13 +62,7 @@ const VoiceSearch = ({
         result.browser.name?.includes("Firefox") ||
         result.browser.name?.includes("Opera");
 
-      const hasSpeechRecognition = !!(
-        window.webkitSpeechRecognition || window.SpeechRecognition
-      );
-
-      setIsSpeechRecognitionSupported(
-        hasSpeechRecognition && !isFirefoxOrOpera
-      );
+      setIsSpeechRecognitionSupported(SpeechRecognition && !isFirefoxOrOpera);
     } catch (e) {
       // Fallback if UAParser fails
       if (!isBrowser) return;
@@ -66,13 +71,7 @@ const VoiceSearch = ({
       const isFirefoxOrOpera =
         userAgent.indexOf("firefox") > -1 || userAgent.indexOf("opera") > -1;
 
-      const hasSpeechRecognition = !!(
-        window.webkitSpeechRecognition || window.SpeechRecognition
-      );
-
-      setIsSpeechRecognitionSupported(
-        hasSpeechRecognition && !isFirefoxOrOpera
-      );
+      setIsSpeechRecognitionSupported(SpeechRecognition && !isFirefoxOrOpera);
     }
   }, []);
 
@@ -84,14 +83,178 @@ const VoiceSearch = ({
     setIsAndroid(/android/.test(userAgent));
   }, []);
 
+  // Clean up animation resources
+  const cleanupAnimation = () => {
+    // Cancel animation frame
+    if (animationFrameRef.current) {
+      try {
+        cancelAnimationFrame(animationFrameRef.current);
+      } catch (e) {}
+      animationFrameRef.current = null;
+    }
+    isAnimatingRef.current = false;
+  };
+
+  // Standard cleanup just for audio tracks
+  const cleanupAudioTracks = () => {
+    // Stop microphone tracks
+    if (microphoneStreamRef.current) {
+      try {
+        const tracks = microphoneStreamRef.current.getTracks();
+        tracks.forEach((track) => {
+          try {
+            track.stop();
+          } catch (e) {}
+          try {
+            track.enabled = false;
+          } catch (e) {}
+        });
+      } catch (e) {}
+    }
+  };
+
+  // Super aggressive cleanup of all audio resources
+  const aggressiveAudioCleanup = () => {
+    // 1. Clean up animation
+    cleanupAnimation();
+
+    // 2. Stop microphone tracks with multiple methods
+    if (microphoneStreamRef.current) {
+      try {
+        const tracks = microphoneStreamRef.current.getTracks();
+
+        // Apply multiple stopping methods to each track
+        tracks.forEach((track) => {
+          // Method 1: Stop the track
+          try {
+            track.stop();
+          } catch (e) {}
+
+          // Method 2: Disable the track
+          try {
+            track.enabled = false;
+          } catch (e) {}
+
+          // Method 3: Remove the track from all connections
+          try {
+            track.onended = null;
+          } catch (e) {}
+          try {
+            track.onmute = null;
+          } catch (e) {}
+          try {
+            track.onunmute = null;
+          } catch (e) {}
+        });
+      } catch (e) {}
+
+      // Clear the reference
+      microphoneStreamRef.current = null;
+    }
+
+    // 3. Close the AudioContext completely
+    if (audioContextRef.current) {
+      try {
+        if (audioContextRef.current.state !== "closed") {
+          audioContextRef.current.close();
+        }
+      } catch (e) {}
+      audioContextRef.current = null;
+    }
+
+    // 4. Reset analyzer ref
+    analyserRef.current = null;
+
+    // 5. Reset volume
+    setVolume(0);
+
+    // 6. Try to revoke media permissions
+    if (navigator.mediaDevices) {
+      try {
+        if (typeof navigator.permissions?.revoke === "function") {
+          navigator.permissions.revoke({ name: "microphone" }).catch(() => {});
+        } else {
+          // Alternative approach: request audio with false to trick browser
+          navigator.mediaDevices.getUserMedia({ audio: false }).catch(() => {});
+        }
+      } catch (e) {}
+    }
+
+    // 7. Create and trigger a fake audio context to reset audio subsystem
+    if (isBrowser && !audioContextRef.current) {
+      try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (AudioContext) {
+          const tempContext = new AudioContext();
+          tempContext.close().catch(() => {});
+        }
+      } catch (e) {}
+    }
+  };
+
+  // Destroy and nullify the recognition instance
+  const destroyRecognition = () => {
+    if (recognitionRef.current) {
+      try {
+        // First try to abort
+        recognitionRef.current.abort();
+      } catch (e) {}
+
+      try {
+        // Then try to stop
+        recognitionRef.current.stop();
+      } catch (e) {}
+
+      // Remove all event handlers
+      try {
+        recognitionRef.current.onresult = null;
+        recognitionRef.current.onerror = null;
+        recognitionRef.current.onend = null;
+        recognitionRef.current.onstart = null;
+        recognitionRef.current.onspeechend = null;
+        recognitionRef.current.onsoundstart = null;
+        recognitionRef.current.onsoundend = null;
+        recognitionRef.current.onaudiostart = null;
+        recognitionRef.current.onaudioend = null;
+        recognitionRef.current.onnomatch = null;
+      } catch (e) {}
+
+      // Set to null
+      recognitionRef.current = null;
+    }
+  };
+
+  // Thorough stop and cleanup
+  const stopListeningCompletely = () => {
+    // 1. Update state first to prevent UI feedback loops
+    setIsListening(false);
+
+    // 2. Destroy recognition instance
+    destroyRecognition();
+
+    // 3. Cleanup immediate audio resources to stop the animation
+    cleanupAnimation();
+    cleanupAudioTracks();
+
+    // 4. Schedule aggressive cleanup after a short delay (helps with some browsers)
+    if (cleanupTimeoutRef.current) {
+      clearTimeout(cleanupTimeoutRef.current);
+    }
+
+    cleanupTimeoutRef.current = setTimeout(() => {
+      aggressiveAudioCleanup();
+      cleanupTimeoutRef.current = null;
+    }, 300);
+  };
+
   // Initialize audio context and analyzer
   const setupAudioAnalyzer = async () => {
     // Skip if not in browser or on Android devices
     if (!isBrowser || isAndroid) return;
 
     try {
-      // Clean up previous audio resources before creating new ones
-      cleanupAudio();
+      // Clean up previous audio resources
+      cleanupAnimation();
 
       // Create audio context if it doesn't exist
       if (!audioContextRef.current) {
@@ -101,6 +264,9 @@ const VoiceSearch = ({
         } else {
           return; // No AudioContext available
         }
+      } else if (audioContextRef.current.state === "suspended") {
+        // Resume the context if it was suspended
+        await audioContextRef.current.resume();
       }
 
       // Get microphone stream
@@ -129,154 +295,160 @@ const VoiceSearch = ({
       startVolumeAnalysis();
     } catch (error) {
       console.error("Error accessing microphone for analysis:", error);
-      // Don't show error message here, just fail silently for the animation
-      // The speech recognition will still work even if the animation doesn't
     }
-  };
-
-  // Clean up audio resources
-  const cleanupAudio = () => {
-    if (animationFrameRef.current && isBrowser) {
-      cancelAnimationFrame(animationFrameRef.current);
-      animationFrameRef.current = null;
-    }
-
-    if (microphoneStreamRef.current) {
-      microphoneStreamRef.current.getTracks().forEach((track) => track.stop());
-      microphoneStreamRef.current = null;
-    }
-
-    setVolume(0);
   };
 
   // Analyze volume levels
   const startVolumeAnalysis = () => {
     if (!analyserRef.current || !isBrowser) return;
 
+    // Clean up any existing animation frame
+    cleanupAnimation();
+
     const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
+    isAnimatingRef.current = true;
 
     const analyzeVolume = () => {
-      if (!analyserRef.current) return;
-
-      analyserRef.current.getByteFrequencyData(dataArray);
-
-      // Calculate average volume
-      let sum = 0;
-      for (let i = 0; i < dataArray.length; i++) {
-        sum += dataArray[i];
+      // Stop if component is unmounted or analysis should stop
+      if (!analyserRef.current || !isAnimatingRef.current) {
+        cleanupAnimation();
+        return;
       }
-      const avg = sum / dataArray.length;
 
-      // Normalize to 0-100 range
-      const normalizedVolume = Math.min(100, Math.max(0, avg * 1.5));
-      setVolume(normalizedVolume);
+      // Get audio data
+      try {
+        analyserRef.current.getByteFrequencyData(dataArray);
 
-      animationFrameRef.current = requestAnimationFrame(analyzeVolume);
+        // Calculate average volume
+        let sum = 0;
+        for (let i = 0; i < dataArray.length; i++) {
+          sum += dataArray[i];
+        }
+        const avg = sum / dataArray.length;
+
+        // Normalize to 0-100 range
+        const normalizedVolume = Math.min(100, Math.max(0, avg * 1.5));
+
+        // Only update state if we're listening and animating
+        if (isAnimatingRef.current) {
+          setVolume(normalizedVolume);
+          // Continue animation loop
+          animationFrameRef.current = requestAnimationFrame(analyzeVolume);
+        }
+      } catch (e) {
+        // Handle errors in animation loop
+        cleanupAnimation();
+      }
     };
 
-    analyzeVolume();
+    // Start the animation loop
+    animationFrameRef.current = requestAnimationFrame(analyzeVolume);
   };
 
+  // Effect to manage animation state when listening changes
   useEffect(() => {
-    // Skip on server-side
-    if (!isBrowser) return;
-
-    // Initialize speech recognition if available in the browser
-    if (window.SpeechRecognition || window.webkitSpeechRecognition) {
-      try {
-        const SpeechRecognition =
-          window.SpeechRecognition || window.webkitSpeechRecognition;
-        const recognitionInstance = new SpeechRecognition();
-
-        recognitionInstance.continuous = false;
-        recognitionInstance.interimResults = false;
-        recognitionInstance.lang = language; // Use language from props
-
-        // Increase max alternatives for Android devices
-        if (isAndroid) {
-          recognitionInstance.maxAlternatives = 3; // Get multiple alternatives on Android
-        }
-
-        recognitionInstance.onresult = (event) => {
-          try {
-            if (event.results && event.results[0]) {
-              // Get the most confident result
-              const transcript = event.results[0][0].transcript;
-              handleSearch(transcript);
-            } else {
-              Error("No speech was detected. Please try again.");
-            }
-          } catch (error) {
-            console.error("Error processing speech result:", error);
-            Error("Failed to process speech. Please try again.");
-          } finally {
-            setIsListening(false);
-            cleanupAudio();
-          }
-        };
-
-        recognitionInstance.onerror = (event) => {
-          setIsListening(false);
-          cleanupAudio();
-          console.error("Speech recognition error:", event.error);
-
-          // Handle specific error types
-          switch (event.error) {
-            case "no-speech":
-              Error("No speech was detected. Please try again.");
-              break;
-            case "audio-capture":
-              Error("Microphone not found or not working properly.");
-              break;
-            case "not-allowed":
-              Error(
-                "Microphone access denied. Please allow microphone access."
-              );
-              break;
-            case "network":
-              Error("Network error occurred. Please check your connection.");
-              break;
-            case "aborted":
-              // User aborted, don't show error
-              // Error("");
-              break;
-            default:
-              // On Android, don't show generic errors as they're common and confusing
-              if (!isAndroid) {
-                Error("Speech recognition error. Please try again.");
-              }
-          }
-        };
-
-        recognitionInstance.onend = () => {
-          setIsListening(false);
-          cleanupAudio();
-        };
-
-        recognitionInstance.onnomatch = () => {
-          // On Android, don't show this error as it happens frequently
-          if (!isAndroid) {
-            Error("Could not recognize what you said. Please try again.");
-          }
-          setIsListening(false);
-          cleanupAudio();
-        };
-
-        setRecognition(recognitionInstance);
-      } catch (error) {
-        console.error("Error initializing speech recognition:", error);
-        Error("Failed to initialize speech recognition.");
+    if (isListening) {
+      isAnimatingRef.current = true;
+      if (analyserRef.current && !animationFrameRef.current && !isAndroid) {
+        startVolumeAnalysis();
       }
     } else {
-      console.warn("Speech recognition not supported in this browser");
-      Error("Speech recognition not supported in your browser.");
+      // Stop animation when not listening
+      cleanupAnimation();
     }
+  }, [isListening, isAndroid]);
 
-    // Cleanup on component unmount
+  // Create a new recognition instance
+  const createNewRecognition = () => {
+    if (!isBrowser || !SpeechRecognition) return null;
+
+    // Create fresh instance
+    try {
+      const recognitionInstance = new SpeechRecognition();
+
+      // Configure the instance
+      recognitionInstance.continuous = false;
+      recognitionInstance.interimResults = false;
+      recognitionInstance.lang = language;
+
+      // Increase max alternatives for Android devices
+      if (isAndroid) {
+        recognitionInstance.maxAlternatives = 3;
+      }
+
+      // Set up event handlers
+      recognitionInstance.onresult = (event) => {
+        try {
+          if (event.results && event.results[0]) {
+            const transcript = event.results[0][0].transcript;
+            handleSearch(transcript);
+          } else {
+            Error("No speech was detected. Please try again.");
+          }
+        } catch (error) {
+          console.error("Error processing speech result:", error);
+          Error("Failed to process speech. Please try again.");
+        } finally {
+          stopListeningCompletely();
+        }
+      };
+
+      recognitionInstance.onerror = (event) => {
+        console.error("Speech recognition error:", event.error);
+
+        switch (event.error) {
+          case "no-speech":
+            Error("No speech was detected. Please try again.");
+            break;
+          case "audio-capture":
+            Error("Microphone not found or not working properly.");
+            break;
+          case "not-allowed":
+            Error("Microphone access denied. Please allow microphone access.");
+            break;
+          case "network":
+            Error("Network error occurred. Please check your connection.");
+            break;
+          case "aborted":
+            // User aborted, don't show error
+            break;
+          default:
+            if (!isAndroid) {
+              Error("Speech recognition error. Please try again.");
+            }
+        }
+
+        stopListeningCompletely();
+      };
+
+      recognitionInstance.onend = () => {
+        stopListeningCompletely();
+      };
+
+      recognitionInstance.onnomatch = () => {
+        if (!isAndroid) {
+          Error("Could not recognize what you said. Please try again.");
+        }
+        stopListeningCompletely();
+      };
+
+      return recognitionInstance;
+    } catch (error) {
+      console.error("Error creating recognition instance:", error);
+      return null;
+    }
+  };
+
+  // Cleanup on unmount
+  useEffect(() => {
     return () => {
-      cleanupAudio();
+      isAnimatingRef.current = false;
+      stopListeningCompletely();
+      if (cleanupTimeoutRef.current) {
+        clearTimeout(cleanupTimeoutRef.current);
+      }
     };
-  }, [handleSearch, isAndroid, language]);
+  }, []);
 
   // For Android pulse animation
   const [androidPulseState, setAndroidPulseState] = useState(false);
@@ -305,21 +477,24 @@ const VoiceSearch = ({
     // Skip on server-side
     if (!isBrowser) return;
 
-    if (!recognition) {
-      Error(
-        "Speech recognition not available. Please try a different browser."
-      );
-      return;
-    }
+    if (isListening) {
+      // Stop listening
+      stopListeningCompletely();
+    } else {
+      // Start listening with a fresh recognition instance
+      destroyRecognition();
+      recognitionRef.current = createNewRecognition();
 
-    try {
-      if (isListening) {
-        recognition.stop();
-        setIsListening(false);
-        cleanupAudio();
-      } else {
-        // Start speech recognition first
-        recognition.start();
+      if (!recognitionRef.current) {
+        Error(
+          "Speech recognition not available. Please try a different browser."
+        );
+        return;
+      }
+
+      try {
+        // Start speech recognition
+        recognitionRef.current.start();
         setIsListening(true);
 
         // Then setup audio analyzer separately (skip on Android)
@@ -327,19 +502,17 @@ const VoiceSearch = ({
           try {
             await setupAudioAnalyzer();
           } catch (analyzerError) {
-            // If analyzer setup fails, speech recognition can still work
             console.warn(
               "Audio analyzer setup failed, but speech recognition will continue:",
               analyzerError
             );
           }
         }
+      } catch (error) {
+        console.error("Error starting speech recognition:", error);
+        Error("Failed to start speech recognition. Please try again.");
+        stopListeningCompletely();
       }
-    } catch (error) {
-      console.error("Error toggling speech recognition:", error);
-      Error("Failed to start speech recognition. Please try again.");
-      setIsListening(false);
-      cleanupAudio();
     }
   };
 
