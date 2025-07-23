@@ -1,0 +1,53 @@
+{
+  "name": "react-voice-search",
+  "version": "1.0.0",
+  "description": "A React voice search component with visualization and cross-browser support",
+  "main": "dist/index.js",
+  "module": "dist/index.esm.js",
+  "scripts": {
+    "build": "rollup -c",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "prepare": "npm run build"
+  },
+  "keywords": [
+    "react",
+    "voice",
+    "search",
+    "speech",
+    "recognition",
+    "microphone",
+    "audio"
+  ],
+  "author": "Alwin",
+  "license": "MIT",
+  "peerDependencies": {
+    "react": "^18.0.0 || ^19.0.0",
+    "react-dom": "^18.0.0 || ^19.0.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.28.0",
+    "@babel/preset-env": "^7.28.0",
+    "@babel/preset-react": "^7.27.1",
+    "@rollup/plugin-babel": "^6.0.4",
+    "@rollup/plugin-commonjs": "^28.0.6",
+    "@rollup/plugin-node-resolve": "^16.0.1",
+    "@rollup/plugin-terser": "^0.4.4",
+    "rollup": "^4.45.1",
+    "rollup-plugin-peer-deps-external": "^2.2.4"
+  },
+  "dependencies": {
+    "prop-types": "^15.8.1",
+    "ua-parser-js": "^2.0.4"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yourusername/react-voice-search.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yourusername/react-voice-search/issues"
+  },
+  "homepage": "https://github.com/yourusername/react-voice-search#readme",
+  "directories": {
+    "example": "example"
+  }
+}
