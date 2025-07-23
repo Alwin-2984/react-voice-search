@@ -2,20 +2,6 @@ import React, { useState, useEffect, useRef } from "react";
 import PropTypes from "prop-types";
 import { UAParser } from "ua-parser-js";
 
-// Default icons if MUI icons aren't available
-const DefaultSearchIcon = ({ className }) => (
-  <svg
-    className={className}
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="currentColor"
-    width="24"
-    height="24"
-  >
-    <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z" />
-  </svg>
-);
-
 const DefaultMicIcon = ({ className }) => (
   <svg
     className={className}
@@ -54,43 +40,30 @@ const VoiceSearch = ({
   useEffect(() => {
     if (typeof window !== "undefined") {
       try {
+        // Create UAParser instance only once
         const parser = new UAParser();
         const result = parser.getResult();
         const isFirefoxOrOpera =
-          result.browser.name.includes("Firefox") ||
-          result.browser.name.includes("Opera");
+          result.browser.name?.includes("Firefox") ||
+          result.browser.name?.includes("Opera");
 
-        if (
+        setIsSpeechRecognitionSupported(
           (window.webkitSpeechRecognition || window.SpeechRecognition) &&
-          !isFirefoxOrOpera
-        ) {
-          setIsSpeechRecognitionSupported(true);
-        }
+            !isFirefoxOrOpera
+        );
       } catch (e) {
         // Fallback if UAParser fails
         const userAgent = window.navigator.userAgent.toLowerCase();
         const isFirefoxOrOpera =
           userAgent.indexOf("firefox") > -1 || userAgent.indexOf("opera") > -1;
 
-        if (
+        setIsSpeechRecognitionSupported(
           (window.webkitSpeechRecognition || window.SpeechRecognition) &&
-          !isFirefoxOrOpera
-        ) {
-          setIsSpeechRecognitionSupported(true);
-        }
+            !isFirefoxOrOpera
+        );
       }
     }
   }, []);
-
-  // Helper function to check speech recognition support - not needed anymore
-  // const checkSpeechRecognition = (isFirefoxOrOpera) => {
-  //   if (
-  //     (window.webkitSpeechRecognition || window.SpeechRecognition) &&
-  //     !isFirefoxOrOpera
-  //   ) {
-  //     setIsSpeechRecognitionSupported(true);
-  //   }
-  // };
 
   // Check if device is Android
   useEffect(() => {
@@ -106,6 +79,9 @@ const VoiceSearch = ({
     if (isAndroid) return;
 
     try {
+      // Clean up previous audio resources before creating new ones
+      cleanupAudio();
+
       // Create audio context if it doesn't exist
       if (!audioContextRef.current) {
         audioContextRef.current = new (window.AudioContext ||
@@ -243,18 +219,13 @@ const VoiceSearch = ({
               break;
             case "aborted":
               // User aborted, don't show error
-              Error("");
+              // Error("");
               break;
             default:
               // On Android, don't show generic errors as they're common and confusing
               if (!isAndroid) {
                 Error("Speech recognition error. Please try again.");
               }
-          }
-
-          // Clear error message after 5 seconds
-          if (errorMessage) {
-            setTimeout(() => Error(""), 5000);
           }
         };
 
@@ -267,7 +238,6 @@ const VoiceSearch = ({
           // On Android, don't show this error as it happens frequently
           if (!isAndroid) {
             Error("Could not recognize what you said. Please try again.");
-            setTimeout(() => Error(""), 5000);
           }
           setIsListening(false);
           cleanupAudio();
@@ -312,13 +282,10 @@ const VoiceSearch = ({
 
   const toggleListening = async () => {
     // Clear any previous error messages
-    Error("");
-
     if (!recognition) {
       Error(
         "Speech recognition not available. Please try a different browser."
       );
-      setTimeout(() => Error(""), 5000);
       return;
     }
 
@@ -350,7 +317,6 @@ const VoiceSearch = ({
       Error("Failed to start speech recognition. Please try again.");
       setIsListening(false);
       cleanupAudio();
-      setTimeout(() => Error(""), 5000);
     }
   };
 
@@ -365,22 +331,13 @@ const VoiceSearch = ({
   const MicIconComponent = customMicIcon || DefaultMicIcon;
 
   // Base styles for the component that can be extended via props
-  const containerStyle = {
-    display: "flex",
-    flexDirection: "column",
-    width: "100%",
-    justifyContent: "center",
-    alignItems: "center",
-    ...customStyles.container,
-  };
-
   const inputContainerStyle = {
     display: "flex",
     flexDirection: "row",
     boxSizing: "border-box",
     height: "50px",
     position: "relative",
-    width: width || "fit-content",
+    width: width || "50px",
     zIndex: 10,
     ...customStyles.inputContainer,
   };
@@ -438,7 +395,6 @@ const VoiceSearch = ({
   };
 
   // CSS classes to apply
-  const containerClass = customClasses.container || "";
   const inputContainerClass = customClasses.inputContainer || "";
   const micContainerClass = customClasses.micContainer || "";
   const pulseClass = customClasses.pulse || "";
@@ -472,13 +428,12 @@ const VoiceSearch = ({
 VoiceSearch.propTypes = {
   width: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
   darkMode: PropTypes.bool,
-  inputTextStyle: PropTypes.object,
-  handleSearch: PropTypes.func,
+  handleSearch: PropTypes.func.isRequired,
   language: PropTypes.string,
-  customSearchIcon: PropTypes.elementType,
   customMicIcon: PropTypes.elementType,
   customStyles: PropTypes.object,
   customClasses: PropTypes.object,
+  Error: PropTypes.func,
 };
 
 export default VoiceSearch;
