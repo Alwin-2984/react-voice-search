@@ -10,6 +10,7 @@ A React component that provides voice search functionality with audio visualizat
 - Customizable styling with both inline styles and CSS classes
 - Error handling and user feedback
 - Custom icons support
+- Server-Side Rendering (SSR) compatible
 
 ## Installation
 
@@ -118,6 +119,115 @@ const customClasses = {
   micIcon: "my-mic-icon",
 };
 ```
+
+## Server-Side Rendering (SSR) Compatibility
+
+This component is designed to work with Server-Side Rendering frameworks like Next.js. The component:
+
+1. Checks for browser environment before using browser-specific APIs
+2. Renders a minimal placeholder during server-side rendering
+3. Initializes all browser-specific functionality only on the client side
+
+### Usage with Next.js
+
+While the component is SSR-safe, for optimal performance in Next.js applications, you may want to use dynamic imports:
+
+```jsx
+import dynamic from "next/dynamic";
+
+// Import the component with SSR disabled
+const VoiceSearch = dynamic(() => import("react-voice-search"), {
+  ssr: false,
+});
+
+function SearchPage() {
+  const handleSearch = (transcript) => {
+    console.log("Voice search:", transcript);
+    // Your search logic here
+  };
+
+  return (
+    <div>
+      <h1>Search</h1>
+      <VoiceSearch handleSearch={handleSearch} />
+    </div>
+  );
+}
+
+export default SearchPage;
+```
+
+This approach prevents any hydration mismatches and ensures the component only loads and initializes on the client side.
+
+### Handling Hydration Errors in Next.js
+
+If you're still experiencing hydration errors related to browser extensions adding attributes to HTML elements (like `__gchrome_remoteframetoken`), you can suppress these errors by adding the following code to your Next.js application:
+
+1. Create a file called `suppressHydrationWarning.js` in your project:
+
+```jsx
+// suppressHydrationWarning.js
+import { useEffect } from "react";
+
+export function useSuppressHydrationWarning() {
+  useEffect(() => {
+    // This runs only on the client, after hydration
+    if (typeof window !== "undefined") {
+      // Original console.error
+      const originalConsoleError = console.error;
+
+      // Override console.error to suppress hydration warnings
+      console.error = (...args) => {
+        if (
+          args[0]?.includes("Warning: Text content did not match") ||
+          args[0]?.includes("Warning: Prop") ||
+          args[0]?.includes("Warning: Attribute") ||
+          args[0]?.includes("hydrat")
+        ) {
+          return;
+        }
+        originalConsoleError(...args);
+      };
+
+      // Clean up on unmount
+      return () => {
+        console.error = originalConsoleError;
+      };
+    }
+  }, []);
+}
+```
+
+2. Update your Next.js `_app.js` or `layout.js` file:
+
+```jsx
+// For _app.js (Pages Router)
+import { useSuppressHydrationWarning } from '../suppressHydrationWarning';
+
+function MyApp({ Component, pageProps }) {
+  useSuppressHydrationWarning();
+
+  return <Component {...pageProps} />;
+}
+
+export default MyApp;
+
+// OR for App Router layout.js
+'use client';
+import { useSuppressHydrationWarning } from './suppressHydrationWarning';
+
+export default function RootLayout({ children }) {
+  useSuppressHydrationWarning();
+
+  return (
+    <html lang="en">
+      <body>{children}</body>
+    </html>
+  );
+}
+```
+
+This approach will suppress hydration warnings caused by elements outside your control, such as browser extensions adding attributes to the HTML.
 
 ## Browser Support
 

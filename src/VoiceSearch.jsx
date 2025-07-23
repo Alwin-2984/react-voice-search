@@ -15,6 +15,9 @@ const DefaultMicIcon = ({ className }) => (
   </svg>
 );
 
+// Check if code is running in browser environment
+const isBrowser = typeof window !== "undefined";
+
 const VoiceSearch = ({
   width,
   darkMode = false,
@@ -38,45 +41,53 @@ const VoiceSearch = ({
 
   // Check browser compatibility for speech recognition
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      try {
-        // Create UAParser instance only once
-        const parser = new UAParser();
-        const result = parser.getResult();
-        const isFirefoxOrOpera =
-          result.browser.name?.includes("Firefox") ||
-          result.browser.name?.includes("Opera");
+    if (!isBrowser) return;
 
-        setIsSpeechRecognitionSupported(
-          (window.webkitSpeechRecognition || window.SpeechRecognition) &&
-            !isFirefoxOrOpera
-        );
-      } catch (e) {
-        // Fallback if UAParser fails
-        const userAgent = window.navigator.userAgent.toLowerCase();
-        const isFirefoxOrOpera =
-          userAgent.indexOf("firefox") > -1 || userAgent.indexOf("opera") > -1;
+    try {
+      // Create UAParser instance only once
+      const parser = new UAParser();
+      const result = parser.getResult();
+      const isFirefoxOrOpera =
+        result.browser.name?.includes("Firefox") ||
+        result.browser.name?.includes("Opera");
 
-        setIsSpeechRecognitionSupported(
-          (window.webkitSpeechRecognition || window.SpeechRecognition) &&
-            !isFirefoxOrOpera
-        );
-      }
+      const hasSpeechRecognition = !!(
+        window.webkitSpeechRecognition || window.SpeechRecognition
+      );
+
+      setIsSpeechRecognitionSupported(
+        hasSpeechRecognition && !isFirefoxOrOpera
+      );
+    } catch (e) {
+      // Fallback if UAParser fails
+      if (!isBrowser) return;
+
+      const userAgent = window.navigator.userAgent.toLowerCase();
+      const isFirefoxOrOpera =
+        userAgent.indexOf("firefox") > -1 || userAgent.indexOf("opera") > -1;
+
+      const hasSpeechRecognition = !!(
+        window.webkitSpeechRecognition || window.SpeechRecognition
+      );
+
+      setIsSpeechRecognitionSupported(
+        hasSpeechRecognition && !isFirefoxOrOpera
+      );
     }
   }, []);
 
   // Check if device is Android
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const userAgent = window.navigator.userAgent.toLowerCase();
-      setIsAndroid(/android/.test(userAgent));
-    }
+    if (!isBrowser) return;
+
+    const userAgent = window.navigator.userAgent.toLowerCase();
+    setIsAndroid(/android/.test(userAgent));
   }, []);
 
   // Initialize audio context and analyzer
   const setupAudioAnalyzer = async () => {
-    // Skip audio analysis on Android devices
-    if (isAndroid) return;
+    // Skip if not in browser or on Android devices
+    if (!isBrowser || isAndroid) return;
 
     try {
       // Clean up previous audio resources before creating new ones
@@ -84,11 +95,19 @@ const VoiceSearch = ({
 
       // Create audio context if it doesn't exist
       if (!audioContextRef.current) {
-        audioContextRef.current = new (window.AudioContext ||
-          window.webkitAudioContext)();
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (AudioContext) {
+          audioContextRef.current = new AudioContext();
+        } else {
+          return; // No AudioContext available
+        }
       }
 
       // Get microphone stream
+      if (!navigator?.mediaDevices?.getUserMedia) {
+        return; // No media devices API
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: true,
         video: false,
@@ -117,7 +136,7 @@ const VoiceSearch = ({
 
   // Clean up audio resources
   const cleanupAudio = () => {
-    if (animationFrameRef.current) {
+    if (animationFrameRef.current && isBrowser) {
       cancelAnimationFrame(animationFrameRef.current);
       animationFrameRef.current = null;
     }
@@ -132,7 +151,7 @@ const VoiceSearch = ({
 
   // Analyze volume levels
   const startVolumeAnalysis = () => {
-    if (!analyserRef.current) return;
+    if (!analyserRef.current || !isBrowser) return;
 
     const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
 
@@ -159,11 +178,11 @@ const VoiceSearch = ({
   };
 
   useEffect(() => {
+    // Skip on server-side
+    if (!isBrowser) return;
+
     // Initialize speech recognition if available in the browser
-    if (
-      (typeof window !== "undefined" && "SpeechRecognition" in window) ||
-      "webkitSpeechRecognition" in window
-    ) {
+    if (window.SpeechRecognition || window.webkitSpeechRecognition) {
       try {
         const SpeechRecognition =
           window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -264,6 +283,8 @@ const VoiceSearch = ({
 
   // Set up Android pulse animation
   useEffect(() => {
+    if (!isBrowser) return;
+
     let pulseInterval;
 
     if (isAndroid && isListening) {
@@ -281,7 +302,9 @@ const VoiceSearch = ({
   }, [isAndroid, isListening]);
 
   const toggleListening = async () => {
-    // Clear any previous error messages
+    // Skip on server-side
+    if (!isBrowser) return;
+
     if (!recognition) {
       Error(
         "Speech recognition not available. Please try a different browser."
@@ -405,6 +428,13 @@ const VoiceSearch = ({
     ${darkMode ? "text-white opacity-80" : "text-black"} 
     ${isListening ? "animate-pulse text-red-500" : ""}
   `;
+
+  // Only render the component on the client-side
+  if (!isBrowser) {
+    return (
+      <div className={inputContainerClass} style={inputContainerStyle}></div>
+    );
+  }
 
   return (
     <div className={inputContainerClass} style={inputContainerStyle}>
