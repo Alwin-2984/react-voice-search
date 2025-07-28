@@ -23,14 +23,18 @@ yarn add react-voice-search
 ## Usage
 
 ```jsx
-import React, { useState } from "react";
+import React from "react";
 import VoiceSearch from "react-voice-search";
 
 function App() {
-  const [searchTerm, setSearchTerm] = useState("");
+  // Error handler function
+  const handleError = (errorMessage) => {
+    console.error(errorMessage);
+    // You can display this error to the user
+  };
 
-  const handleSearch = (e) => {
-    console.log("Searching for:", e.target.value);
+  const handleSearch = (transcript) => {
+    console.log("Voice search transcript:", transcript);
     // Your search logic here
   };
 
@@ -39,10 +43,9 @@ function App() {
       <h1>Voice Search Example</h1>
       <div style={{ maxWidth: "600px", margin: "0 auto" }}>
         <VoiceSearch
-          setSearchData={setSearchTerm}
-          searchData={searchTerm}
           handleSearch={handleSearch}
-          placeholder="Search for anything..."
+          Error={handleError}
+          width="100%"
         />
       </div>
     </div>
@@ -54,20 +57,16 @@ export default App;
 
 ## Props
 
-| Prop               | Type          | Default                                | Description                                                      |
-| ------------------ | ------------- | -------------------------------------- | ---------------------------------------------------------------- |
-| `setSearchData`    | Function      | Required                               | Function to update the search text state                         |
-| `searchData`       | String        | `''`                                   | The current search text value                                    |
-| `handleSearch`     | Function      | -                                      | Function called when search text changes or speech is recognized |
-| `width`            | String/Number | `'100%'`                               | Width of the search component                                    |
-| `darkMode`         | Boolean       | `false`                                | Enable dark mode styling                                         |
-| `inputTextStyle`   | Object        | `{}`                                   | Custom styles for the input element                              |
-| `placeholder`      | String        | `'Search for billers, services, etc.'` | Placeholder text for the input                                   |
-| `language`         | String        | `'en-US'`                              | Language for speech recognition                                  |
-| `customSearchIcon` | Component     | -                                      | Custom component for the search icon                             |
-| `customMicIcon`    | Component     | -                                      | Custom component for the microphone icon                         |
-| `customStyles`     | Object        | `{}`                                   | Custom styles for each element in the component                  |
-| `customClasses`    | Object        | `{}`                                   | Custom CSS classes for each element in the component             |
+| Prop            | Type          | Default    | Description                                                                  |
+| --------------- | ------------- | ---------- | ---------------------------------------------------------------------------- |
+| `handleSearch`  | Function      | Required   | Function called when speech is recognized (receives transcript as parameter) |
+| `width`         | String/Number | `'50px'`   | Width of the search component                                                |
+| `darkMode`      | Boolean       | `false`    | Enable dark mode styling                                                     |
+| `language`      | String        | `'en-US'`  | Language for speech recognition                                              |
+| `customMicIcon` | Component     | -          | Custom component for the microphone icon                                     |
+| `customStyles`  | Object        | `{}`       | Custom styles for each element in the component                              |
+| `customClasses` | Object        | `{}`       | Custom CSS classes for each element in the component                         |
+| `Error`         | Function      | `() => {}` | Function to handle and display errors to the user                            |
 
 ### customStyles Object
 
@@ -75,17 +74,8 @@ You can customize the styling of each part of the component:
 
 ```jsx
 const customStyles = {
-  container: {
-    /* styles for the outer container */
-  },
   inputContainer: {
     /* styles for the input wrapper */
-  },
-  iconButton: {
-    /* styles for the search icon button */
-  },
-  input: {
-    /* styles for the input element */
   },
   micContainer: {
     /* styles for the mic button container */
@@ -96,9 +86,6 @@ const customStyles = {
   micButton: {
     /* styles for the mic button */
   },
-  error: {
-    /* styles for the error message */
-  },
 };
 ```
 
@@ -108,14 +95,10 @@ You can also apply custom CSS classes:
 
 ```jsx
 const customClasses = {
-  container: "my-container-class",
   inputContainer: "my-input-wrapper",
-  input: "my-input-class",
   micContainer: "my-mic-container",
   pulse: "my-pulse-animation",
   micButton: "my-mic-button",
-  error: "my-error-message",
-  searchIcon: "my-search-icon",
   micIcon: "my-mic-icon",
 };
 ```
