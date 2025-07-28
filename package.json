@@ -41,12 +41,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/yourusername/react-voice-search.git"
+    "url": "git+https://github.com/Alwin-2984/react-voice-search.git"
   },
   "bugs": {
-    "url": "https://github.com/yourusername/react-voice-search/issues"
+    "url": "https://github.com/Alwin-2984/react-voice-search/issues"
   },
-  "homepage": "https://github.com/yourusername/react-voice-search#readme",
+  "homepage": "https://github.com/Alwin-2984/react-voice-search#readme",
   "directories": {
     "example": "example"
   }
