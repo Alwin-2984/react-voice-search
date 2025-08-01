@@ -1,7 +1,7 @@
 {
   "name": "react-voice-search",
   "version": "1.1.0",
-  "description": "A React voice search component with visualization and cross-browser support",
+  "description": "React voice search component with audio visualization, speech recognition, and cross-browser support for Web Speech API. SSR-compatible with Next.js.",
   "main": "dist/index.js",
   "module": "dist/index.esm.js",
   "scripts": {
@@ -16,7 +16,19 @@
     "speech",
     "recognition",
     "microphone",
-    "audio"
+    "audio",
+    "voice-search",
+    "speech-recognition",
+    "speech-to-text",
+    "voice-input",
+    "react-component",
+    "web-speech-api",
+    "voice-control",
+    "audio-visualization",
+    "cross-browser",
+    "ssr-compatible",
+    "nextjs",
+    "typescript"
   ],
   "author": "Alwin",
   "license": "MIT",
