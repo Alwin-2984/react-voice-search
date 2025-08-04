@@ -1,9 +1,15 @@
 {
   "name": "react-voice-search",
   "version": "1.1.1",
-  "description": "React voice search component with audio visualization, speech recognition, and cross-browser support for Web Speech API. SSR-compatible with Next.js.",
+  "description": "🎤 React voice search component with real-time audio visualization, speech recognition, and cross-browser support. Works with Next.js SSR, TypeScript ready, and mobile-optimized for modern web applications.",
   "main": "dist/index.js",
   "module": "dist/index.esm.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "rollup -c",
     "test": "echo \"Error: no test specified\" && exit 1",
@@ -11,27 +17,49 @@
   },
   "keywords": [
     "react",
-    "voice",
-    "search",
-    "speech",
-    "recognition",
-    "microphone",
-    "audio",
     "voice-search",
     "speech-recognition",
     "speech-to-text",
     "voice-input",
-    "react-component",
-    "web-speech-api",
-    "voice-control",
+    "microphone",
     "audio-visualization",
-    "cross-browser",
-    "ssr-compatible",
+    "web-speech-api",
+    "react-component",
+    "react-hook",
     "nextjs",
-    "typescript"
+    "ssr",
+    "typescript",
+    "javascript",
+    "cross-browser",
+    "mobile-friendly",
+    "real-time",
+    "voice-control",
+    "audio",
+    "search",
+    "speech",
+    "recognition",
+    "voice",
+    "ui-component",
+    "accessibility",
+    "web-api",
+    "browser-api",
+    "frontend",
+    "webapp"
   ],
-  "author": "Alwin",
+  "author": {
+    "name": "Alwin KC",
+    "email": "alwinkc@example.com",
+    "url": "https://github.com/Alwin-2984"
+  },
   "license": "MIT",
+  "engines": {
+    "node": ">=14.0.0",
+    "npm": ">=6.0.0"
+  },
+  "funding": {
+    "type": "github",
+    "url": "https://github.com/sponsors/Alwin-2984"
+  },
   "peerDependencies": {
     "react": "^18.0.0 || ^19.0.0",
     "react-dom": "^18.0.0 || ^19.0.0"
